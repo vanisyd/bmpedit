@@ -1,20 +1,21 @@
 use crate::app::entities::{Interactive, Render, Renderable};
-use crate::app::renderer::{Position, RenderContext, Size, PIXEL_BYTES_AMT};
+use crate::app::renderer::{Position, RenderContext, Resizable, Scalable, Size, PIXEL_BYTES_AMT};
 
 pub struct Button<R: Renderable> {
     inner: R,
     position: Position,
     text: String,
-    size: Size
+    size: usize
 }
 
-impl<R: Renderable> Button<R> {
-    pub fn new(inner: R, position: Position) -> Self {
+impl<R: Renderable + Scalable> Button<R> {
+    pub fn new(mut inner: R, position: Position, size: usize) -> Self {
+        inner.with_scale(size);
         Self {
             inner,
             position,
             text: String::from("Test"),
-            size: (5, 5)
+            size
         }
     }
 }
@@ -23,7 +24,7 @@ impl<R: Renderable> Render for Button<R> {
     fn render(&self, ctx: &mut RenderContext) -> Result<(), String> {
         let pixels = self.inner.get_pixels()?;
         let mut offset = self.position.as_offset(ctx.width) * PIXEL_BYTES_AMT;
-        let slice_width = self.inner.get_width() as usize * PIXEL_BYTES_AMT;
+        let slice_width = self.inner.get_render_width() as usize * PIXEL_BYTES_AMT;
         for slice in pixels.chunks_exact(slice_width) {
             ctx.fill_pixels(offset, slice)
                 .map_err(|err| format!("Failed to render button: {:?}", err))?;

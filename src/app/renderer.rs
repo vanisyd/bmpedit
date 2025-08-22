@@ -146,8 +146,16 @@ pub trait Renderable {
     fn destroy(&self) {}
     fn get_width(&self) -> u16;
     fn get_height(&self) -> u16;
+    fn get_render_width(&self) -> u16;
+    fn get_render_height(&self) -> u16;
+}
 
-    fn with_scaling(&self, x: usize, y: usize) -> &Self;
+pub trait Resizable {
+    fn with_size(&mut self, x: usize, y: usize) -> &Self;
+}
+
+pub trait Scalable {
+    fn with_scale(&mut self, scale: usize) -> &Self;
 }
 
 pub type Offset = usize;

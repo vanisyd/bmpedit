@@ -1,5 +1,5 @@
 use std::io::{BufReader, Error, Read};
-use crate::app::renderer::{RenderContext, Renderable, PIXEL_BYTES_AMT};
+use crate::app::renderer::{RenderContext, Renderable, Resizable, Scalable, PIXEL_BYTES_AMT};
 use crate::app::resource::Resource;
 
 static SPRITE_CODE: &[u8] = b"SPRT";
@@ -8,7 +8,9 @@ pub struct Bitmap {
     width: u16,
     height: u16,
     pixels: Vec<u16>,
-    bitmask: Option<Vec<u8>>
+    bitmask: Option<Vec<u8>>,
+    render_width: u16,
+    render_height: u16
 }
 
 struct BitmapHeader {
@@ -26,7 +28,9 @@ impl Bitmap {
             width,
             height,
             pixels: Vec::with_capacity((width * height) as usize),
-            bitmask: None
+            bitmask: None,
+            render_width: width,
+            render_height: height
         }
     }
 
@@ -38,13 +42,17 @@ impl Bitmap {
 
 impl Renderable for Bitmap {
     fn get_pixels(&self) -> Result<Vec<u8>, String> {
-        let mut buf: Vec<u8> = vec![0; (self.width * self.height) as usize * PIXEL_BYTES_AMT];
-        let mut ctx = RenderContext::new(&mut buf, self.width as usize, self.height as usize);
+        let mut buf: Vec<u8> = vec![0; (self.get_render_width() * self.get_render_height()) as usize * PIXEL_BYTES_AMT];
+        let mut ctx = RenderContext::new(
+            &mut buf,
+            self.get_render_width() as usize,
+            self.get_render_height() as usize
+        );
         let mut offset: usize = 0;
-        for slice in self.pixels.chunks_exact(self.width as usize) {
+        for slice in self.pixels.chunks_exact(self.get_render_width() as usize) {
             ctx.fill_slice(slice, offset)
                 .map_err(|err| format!("Error getting pixels: {:?}", err))?;
-            offset += self.width as usize;
+            offset += self.get_render_width() as usize;
         }
 
         Ok(buf)
@@ -58,17 +66,57 @@ impl Renderable for Bitmap {
         self.height
     }
 
-    fn with_scaling(&self, x: usize, y: usize) -> &Self {
+    fn get_render_width(&self) -> u16 {
+        self.render_width
+    }
+
+    fn get_render_height(&self) -> u16 {
+        self.render_height
+    }
+}
+
+impl Resizable for Bitmap {
+    fn with_size(&mut self, x: usize, y: usize) -> &Self {
         let mut buf = self.pixels.clone();
-        let x_scale = x - (self.width as usize);
-        let y_scale = y - (self.height as usize);
-        for line in self.pixels.chunks_exact(self.width as usize) {
-            let mut ln_buf: Vec<u16> = Vec::with_capacity(x);
+        let x_scale = (x - (self.get_render_width() as usize)) + 1;
+        let y_scale = (y - (self.get_render_height() as usize)) + 1;
+        let new_row_size = x_scale * self.get_render_width() as usize;
+        let new_col_size = y_scale * self.get_render_height() as usize;
+        let mut buf = Vec::with_capacity(new_row_size * new_col_size);
+        for line in self.pixels.chunks_exact(self.get_render_width() as usize) {
+            let mut ln_buf: Vec<u16> = Vec::with_capacity(new_row_size);
             for px in line {
-                ln_buf = [ln_buf, [*px].repeat(x_scale + 1)].concat();
+                ln_buf = [ln_buf, [*px].repeat(x_scale)].concat();
             }
             buf = [buf, ln_buf.repeat(y_scale)].concat();
         }
+        self.pixels = buf;
+        self.render_width = new_row_size as u16;
+        self.render_height = new_col_size as u16;
+
+        self
+    }
+}
+
+impl Scalable for Bitmap {
+    fn with_scale(&mut self, scale: usize) -> &Self {
+        if scale == 1 {
+            return self
+        }
+
+        let new_row_size = scale * self.get_render_width() as usize;
+        let new_col_size = scale * self.get_render_height() as usize;
+        let mut buf = Vec::with_capacity(new_row_size * new_col_size);
+        for line in self.pixels.chunks_exact(self.get_render_width() as usize) {
+            let mut ln_buf: Vec<u16> = Vec::with_capacity(new_row_size);
+            for px in line {
+                ln_buf = [ln_buf, [*px].repeat(scale)].concat();
+            }
+            buf = [buf, ln_buf.repeat(scale)].concat();
+        }
+        self.pixels = buf;
+        self.render_width = new_row_size as u16;
+        self.render_height = new_col_size as u16;
 
         self
     }
@@ -110,7 +158,9 @@ impl Resource for Bitmap {
             width: width.into(),
             height: height.into(),
             pixels,
-            bitmask
+            bitmask,
+            render_width: width.into(),
+            render_height: height.into()
         }
     }
 }

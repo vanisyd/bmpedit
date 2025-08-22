@@ -75,7 +75,7 @@ pub trait Interactive {
 pub fn tst() {
     let bmp = Bitmap::from_file(format!("{}/sprite_x.sprt", PATH_RESOURCES))
         .unwrap();
-    let btn = Button::new(bmp, Position::Absolute(0, 1));
+    let btn = Button::new(bmp, Position::Absolute(0, 0), 2);
     let element = SimpleObject::new(btn);
     let mut app = App::new();
     app.add_entity(element);
